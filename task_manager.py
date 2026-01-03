@@ -9,7 +9,7 @@ class TaskManager:
         # List of dictionaries: { "id": str, "priority": int, "summary": str, "sender": str, "link": str, "time": str }
         self.tasks = []
 
-    def add_task(self, priority: int, summary: str, sender: str, link: str, deadline: str = None):
+    def add_task(self, priority: int, summary: str, sender: str, link: str, deadline: str = None, user_id: int = None):
         """Adds a new task to the list and sorts by priority."""
         logger.info(f"Adding task: {summary}")
         task_id = f"task_{int(datetime.now().timestamp() * 1000)}"
@@ -18,6 +18,7 @@ class TaskManager:
             "priority": priority,
             "summary": summary,
             "sender": sender,
+            "user_id": user_id,
             "link": link,
             "deadline": deadline,
             "time": datetime.now().strftime("%I:%M %p")

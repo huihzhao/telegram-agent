@@ -50,7 +50,8 @@ async def message_handler(client, message):
                 summary=analysis.get('summary', 'No summary'),
                 sender=sender,
                 link=safe_link,
-                deadline=analysis.get('deadline')
+                deadline=analysis.get('deadline'),
+                user_id=message.chat.id
             )
             # Notify user in Telegram
             await message.reply(f"✅ **Task Added**\nPriority: {analysis.get('priority', 0)}\nSummary: {analysis.get('summary', 'No summary')}")

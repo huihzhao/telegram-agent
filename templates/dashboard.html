@@ -112,8 +112,8 @@
                         `<span class="px-2 py-0.5 rounded text-xs font-bold border text-orange-400 border-orange-500/30 bg-orange-500/10 flex items-center gap-1">
                                         📅 ${task.deadline}
                                     </span>` : ''}
-                                <span class="text-xs text-gray-400 flex items-center gap-1">
-                                    👤 ${task.sender}
+                                <span class="text-xs text-gray-400 flex items-center gap-1 bg-gray-900/50 px-2 py-0.5 rounded border border-gray-800">
+                                    👤 ${task.sender} <span class="text-gray-600">(${task.user_id || 'ID Hidden'})</span>
                                 </span>
                             </div>
                             <h3 class="text-lg font-medium text-gray-200">${task.summary}</h3>
