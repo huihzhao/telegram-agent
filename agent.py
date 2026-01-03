@@ -40,12 +40,14 @@ class Agent:
         1. Rate urgency/importance from 0 to 10 (10 is critical emergency, 0 is spam).
         2. Summarize the content in one brief sentence.
         3. Decide if I need to reply or take action (True/False).
+        4. Extract a deadline if present (e.g., "by 5pm", "tomorrow", "Friday"). Return null if no deadline.
         
         Output JSON only:
         {{
             "priority": <int>,
             "summary": "<string>",
-            "action_required": <bool>
+            "action_required": <bool>,
+            "deadline": "<string or null>"
         }}
         """
         

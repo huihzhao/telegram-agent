@@ -49,7 +49,8 @@ async def message_handler(client, message):
                 priority=analysis.get('priority', 0),
                 summary=analysis.get('summary', 'No summary'),
                 sender=sender,
-                link=safe_link
+                link=safe_link,
+                deadline=analysis.get('deadline')
             )
             # Notify user in Telegram
             await message.reply(f"✅ **Task Added**\nPriority: {analysis.get('priority', 0)}\nSummary: {analysis.get('summary', 'No summary')}")
