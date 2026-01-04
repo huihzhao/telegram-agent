@@ -43,3 +43,30 @@ async def mark_done(task_id: str):
         return {"status": "success", "task": task['summary']}
     
     return JSONResponse(status_code=404, content={"error": "Task not found"})
+
+@app.post("/api/reject/{task_id}")
+async def reject_task(task_id: str):
+    if not task_manager:
+        return JSONResponse(status_code=500, content={"error": "TaskManager not initialized"})
+    
+    # Optional logic: Find the task first to log/notify about it
+    task = next((t for t in task_manager.tasks if t["id"] == task_id), None)
+    if task:
+        task_manager.reject_task(task_id)
+        # We might not want to notify for rejections, or maybe we do?
+        # if notification_callback: await notification_callback(f"Rejected: {task['summary']}")
+        return {"status": "success", "task": task['summary']}
+    
+    return JSONResponse(status_code=404, content={"error": "Task not found"})
+
+@app.post("/api/reopen/{task_id}")
+async def reopen_task(task_id: str):
+    if not task_manager:
+        return JSONResponse(status_code=500, content={"error": "TaskManager not initialized"})
+    
+    task = next((t for t in task_manager.tasks if t["id"] == task_id), None)
+    if task:
+        task_manager.reopen_task(task_id)
+        return {"status": "success", "task": task['summary']}
+    
+    return JSONResponse(status_code=404, content={"error": "Task not found"})

@@ -5,3 +5,4 @@ __pycache__/
 *.session
 *.session-journal
 .DS_Store
+tasks.json

@@ -22,7 +22,7 @@ class Agent:
                 logger.info(f"Available model: {m.name}")
             raise e
 
-    async def analyze_message(self, message_text: str, sender_info: str) -> dict:
+    async def analyze_message(self, message_text: str, sender_info: str, memory_text: str = "") -> dict:
         """
         Analyzes a message to determine importance and generate a summary.
         Returns a dictionary: { "priority": int (0-10), "summary": str, "action_required": bool }
@@ -33,15 +33,32 @@ class Agent:
         prompt = f"""
         You are a personal assistant. Analyze the following Chat History.
         
+        Recent Finished Tasks (Memory):
+        {memory_text}
+        
         Chat Context:
         {message_text}
         
         Task:
         1. Context: The last message in the history is the "Trigger".
-        2. Relevance: Is this conversation directing a task, question, or important information specifically to ME (the owner)?
+        Task:
+        1. Context: The last message in the history is the "Trigger".
+        2. Memory Check:
+           - DUPLICATES: If asking for the EXACT same thing as "Recent Finished Tasks" -> Priority 0, Action False.
+           - LEARNING (Topics):
+             - If the request is similar to "REJECTED Tasks" -> Priority 0, Action False.
+             - If the request matches patterns in "ACCEPTED Tasks" -> High Priority.
+           - LEARNING (People):
+             - Check if the SENDER has a history of Rejected tasks in "REJECTED Tasks". If yes, be skeptical -> Priority < 5.
+             - If SENDER is typically Accepted, trust them more.
+        3. Relevance: Is this conversation directing a task, question, or important information specifically to ME (the owner)?
            - If it's a general group chat noise, greetings ("hi", "hello"), or irrelevant chatter -> Priority 0, Action False.
            - If it's a specific request, deadline, or urgent info for me -> High Priority.
-        3. Rate urgency/importance from 0 to 10 (10 is critical, 0 is noise).
+        4. Rate urgency/importance from 0 to 10 (10 is critical, 0 is noise).
+        3. Relevance: Is this conversation directing a task, question, or important information specifically to ME (the owner)?
+           - If it's a general group chat noise, greetings ("hi", "hello"), or irrelevant chatter -> Priority 0, Action False.
+           - If it's a specific request, deadline, or urgent info for me -> High Priority.
+        4. Rate urgency/importance from 0 to 10 (10 is critical, 0 is noise).
         4. Summarize the request in one sentence.
         5. Decide if action is required (True/False). Mark "False" for noise.
         6. Extract deadline if present.

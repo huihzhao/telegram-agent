@@ -45,8 +45,17 @@ async def message_handler(client, message):
 
     context_text = "\n".join(history)
 
-    # Analyze with context
-    analysis = await intelligence_agent.analyze_message(context_text, sender)
+    # Get Memory & Learning Context
+    recent_done = tm.get_recent_done_tasks(limit=5)
+    preferences = tm.get_preference_examples(limit=5)
+    
+    memory_text = "Recent Finished Tasks:\n" + "\n".join([f"- {t['summary']}" for t in recent_done])
+    memory_text += "\n\nUser Preferences (Learning):\n"
+    memory_text += "ACCEPTED Tasks:\n" + "\n".join([f"- {t['summary']} (from {t['sender']})" for t in preferences['accepted']])
+    memory_text += "\nREJECTED Tasks:\n" + "\n".join([f"- {t['summary']} (from {t['sender']})" for t in preferences['rejected']])
+
+    # Analyze with context AND memory
+    analysis = await intelligence_agent.analyze_message(context_text, sender, memory_text)
     logger.info(f"Analysis: {analysis}")
 
     # Add to Task Manager if important (Threshold > 4) or Action Required
@@ -91,14 +100,50 @@ async def start_listener():
     # Register Handlers
     logger.info("Registering handlers...")
     
+
+    # Custom Filter: Start Listener
+    # 1. Replies to ME
+    # 2. Keywords ("Jackie")
+    # Dynamic Keywords
+    dynamic_keywords = []
+
+    # Custom Filter: Start Listener
+    # 1. Replies to ME
+    # 2. Keywords (Dynamic)
+    async def relevant_filter(_, __, message):
+        # 1. Reply to Me
+        if message.reply_to_message and message.reply_to_message.from_user and message.reply_to_message.from_user.is_self:
+            return True
+        
+        # 2. Keywords
+        if message.text:
+            text = message.text.lower()
+            if any(k.lower() in text for k in dynamic_keywords):
+                return True
+        if message.caption:
+            caption = message.caption.lower()
+            if any(k.lower() in caption for k in dynamic_keywords):
+                return True
+                
+        return False
+
+    custom_relevance_filter = filters.create(relevant_filter)
+
     # Message Handlers
-    # Filter: DMs OR Mentions OR Saved Messages
+    # Filter: DMs OR Mentions OR Saved Messages OR Replies to Me OR Keywords
     app.add_handler(handlers.MessageHandler(message_handler, 
-        filters.private | filters.mentioned | filters.chat("me")
+        filters.private | filters.mentioned | filters.chat("me") | custom_relevance_filter
     ), group=0)
 
     # Start the client
     await app.start()
+    
+    # Init Keywords
+    me = await app.get_me()
+    if me.first_name: dynamic_keywords.append(me.first_name)
+    if me.last_name: dynamic_keywords.append(me.last_name)
+    if me.username: dynamic_keywords.append(me.username)
+    logger.info(f"Initialized Keyword Filter: {dynamic_keywords}")
 
     try:
         await app.send_message("me", "⚡ **Agent Just Started** ⚡\nSend me a message to test!")

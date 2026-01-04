@@ -4,17 +4,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agent Dashboard</title>
+    <title>Agent Command Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
                     colors: {
                         gray: {
                             850: '#1f2937',
                             900: '#111827',
                             950: '#0b0f19',
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'slide-up': 'slideUp 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
                         }
                     }
                 }
@@ -23,115 +43,321 @@
     </script>
     <style>
         body {
-            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19;
+            background-image:
+                radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
+                radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
+                radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
+            background-attachment: fixed;
+            background-size: cover;
         }
 
         .glass {
-            background: rgba(31, 41, 55, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(17, 24, 39, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.6);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glow-hover:hover {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
         }
     </style>
 </head>
 
-<body class="bg-gray-950 text-white min-h-screen p-6">
+<body class="text-white min-h-screen p-6 md:p-12 antialiased selection:bg-purple-500/30">
 
-    <div class="max-w-4xl mx-auto">
-        <header class="flex justify-between items-center mb-8">
+    <div class="max-w-5xl mx-auto">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 animate-fade-in">
             <div>
+                <div class="flex items-center gap-3 mb-1">
+                    <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                    <h2 class="text-xs font-bold tracking-widest text-blue-400 uppercase">System Active</h2>
+                </div>
                 <h1
-                    class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
-                    Agent Command Center
+                    class="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-gray-400 tracking-tight">
+                    Command Center
                 </h1>
-                <p class="text-gray-400 mt-1">Local Intelligence Dashboard</p>
+                <p class="text-gray-400 mt-2 text-lg font-light">Monitoring incoming tasks & priorities.</p>
             </div>
-            <div id="status"
-                class="px-3 py-1 rounded-full text-xs font-mono bg-green-500/20 text-green-400 border border-green-500/30">
-                Online
+
+            <div id="status-badge"
+                class="mt-4 md:mt-0 glass-panel px-4 py-2 rounded-full flex items-center gap-2 group cursor-default transition-all duration-300 hover:border-green-500/30">
+                <div id="status-indicator"
+                    class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
+                <span id="status-text"
+                    class="text-sm font-medium text-gray-300 group-hover:text-green-300 transition-colors">Operational</span>
             </div>
         </header>
 
-        <div id="task-container" class="space-y-4">
-            <!-- Tasks will be injected here -->
-            <div class="text-center text-gray-500 py-12">Loading tasks...</div>
+        <div id="main-content" class="animate-slide-up" style="animation-delay: 0.1s;">
+            <!-- Filter/Tabs could go here -->
+
+            <div id="task-container" class="space-y-6">
+                <!-- Tasks will be injected here -->
+                <div class="text-center py-20">
+                    <div
+                        class="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4">
+                    </div>
+                    <p class="text-gray-500 font-light">Syncing with task matrix...</p>
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-6 right-6 flex flex-col gap-2 z-50"></div>
+
     <script>
+        // State management
+        let currentTasks = [];
+        let isFirstLoad = true;
+
         async function fetchTasks() {
             try {
                 const response = await fetch('/api/tasks');
                 const tasks = await response.json();
-                renderTasks(tasks);
+
+                // Simple diff to prevent unnecessary re-renders if data hasn't changed
+                // In a real app, use a proper store or diffing library
+                if (JSON.stringify(tasks) !== JSON.stringify(currentTasks)) {
+                    currentTasks = tasks;
+                    renderTasks(tasks);
+                    if (isFirstLoad) {
+                        isFirstLoad = false;
+                        updateStatus(true);
+                    }
+                }
             } catch (error) {
                 console.error('Error fetching tasks:', error);
-                document.getElementById('status').innerText = 'Offline';
-                document.getElementById('status').className = 'px-3 py-1 rounded-full text-xs font-mono bg-red-500/20 text-red-400 border border-red-500/30';
+                updateStatus(false);
+            }
+        }
+
+        function updateStatus(isOnline) {
+            const badge = document.getElementById('status-badge');
+            const indicator = document.getElementById('status-indicator');
+            const text = document.getElementById('status-text');
+
+            if (isOnline) {
+                indicator.className = 'w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]';
+                text.innerText = 'Operational';
+                text.className = 'text-sm font-medium text-gray-300 group-hover:text-green-300 transition-colors';
+            } else {
+                indicator.className = 'w-2 h-2 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]';
+                text.innerText = 'Disconnected';
+                text.className = 'text-sm font-medium text-gray-300 group-hover:text-red-300 transition-colors';
             }
         }
 
         async function markDone(taskId) {
             try {
                 await fetch(`/api/done/${taskId}`, { method: 'POST' });
-                // Optimistic update
-                fetchTasks();
+                showToast('Task marked as done', 'success');
+                fetchTasks(); // Immediate refresh
             } catch (error) {
-                alert('Failed to mark task as done');
+                showToast('Failed to update task', 'error');
             }
+        }
+
+        async function rejectTask(taskId) {
+            try {
+                await fetch(`/api/reject/${taskId}`, { method: 'POST' });
+                showToast('Task rejected', 'neutral');
+                fetchTasks(); // Immediate refresh
+            } catch (error) {
+                showToast('Failed to update task', 'error');
+            }
+        }
+
+        async function reopenTask(taskId) {
+            try {
+                await fetch(`/api/reopen/${taskId}`, { method: 'POST' });
+                showToast('Task reopened', 'success');
+                fetchTasks(); // Immediate refresh
+            } catch (error) {
+                showToast('Failed to reopen task', 'error');
+            }
+        }
+
+        function showToast(message, type = 'neutral') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+
+            let colors = 'bg-gray-800 border-gray-700 text-white';
+            if (type === 'success') colors = 'bg-green-900/80 border-green-800 text-green-100';
+            if (type === 'error') colors = 'bg-red-900/80 border-red-800 text-red-100';
+
+            toast.className = `px-4 py-3 rounded-lg border shadow-xl backdrop-blur-md transform transition-all duration-300 translate-y-10 opacity-0 ${colors}`;
+            toast.innerText = message;
+
+            container.appendChild(toast);
+
+            // Animate in
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-10', 'opacity-0');
+            });
+
+            // Remove after 3s
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
 
         function renderTasks(tasks) {
             const container = document.getElementById('task-container');
 
+            const activeTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'rejected');
+            const doneTasks = tasks.filter(t => t.status === 'done' || t.status === 'rejected');
+
+            let html = '';
+
             if (tasks.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-12 glass rounded-2xl">
-                        <div class="text-4xl mb-3">✅</div>
-                        <h3 class="text-xl font-semibold text-gray-300">All Clear</h3>
-                        <p class="text-gray-500">No active tasks pending.</p>
+                html = `
+                    <div class="text-center py-24 glass-panel rounded-3xl animate-fade-in border-dashed border border-gray-700">
+                        <div class="text-5xl mb-4 opacity-50">✨</div>
+                        <h3 class="text-2xl font-semibold text-white mb-2">All Caught Up</h3>
+                        <p class="text-gray-400 font-light">No pending directives found in the matrix.</p>
                     </div>
                 `;
+                container.innerHTML = html;
                 return;
             }
 
-            container.innerHTML = tasks.map(task => {
-                const priorityColor = task.priority >= 8 ? 'text-red-400 border-red-500/30 bg-red-500/10' :
-                    task.priority >= 5 ? 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10' :
-                        'text-blue-400 border-blue-500/30 bg-blue-500/10';
+            // Render Active Tasks
+            if (activeTasks.length > 0) {
+                html += `<div class="flex items-center gap-4 mb-6 mt-2">
+                            <h2 class="text-xl font-semibold text-white">Active Directives</h2>
+                            <div class="h-[1px] flex-1 bg-gradient-to-r from-gray-700 to-transparent"></div>
+                            <span class="text-xs font-mono text-gray-500 bg-gray-900/50 px-2 py-1 rounded">${activeTasks.length} PENDING</span>
+                        </div>`;
+                html += activeTasks.map((task, index) => getTaskHTML(task, false, index)).join('');
+            } else if (doneTasks.length > 0) {
+                html += `
+                    <div class="text-center py-10 glass rounded-2xl mb-12 animate-fade-in">
+                         <h3 class="text-xl font-medium text-gray-200">Zero Active Tasks</h3>
+                         <p class="text-gray-500 text-sm mt-1">Excellent productivity levels detected.</p>
+                    </div>`;
+            }
 
-                return `
-                <div class="glass rounded-xl p-5 hover:bg-gray-800/50 transition-all duration-300 border border-gray-800 relative group">
-                    <div class="flex justify-between items-start">
-                        <div class="flex-1">
-                            <div class="flex items-center gap-3 mb-2">
-                                <span class="px-2 py-0.5 rounded text-xs font-bold border ${priorityColor}">
+            // Render History (Done & Rejected)
+            if (doneTasks.length > 0) {
+                html += `
+                    <div class="mt-16 mb-6 flex items-center gap-4 opacity-70">
+                        <h2 class="text-lg font-medium text-gray-400">Archive</h2>
+                        <div class="h-[1px] flex-1 bg-gray-800"></div>
+                    </div>
+                    <div class="grid grid-cols-1 gap-4 opacity-50 hover:opacity-100 transition-opacity duration-500">
+                        ${doneTasks.map((task, index) => getTaskHTML(task, true, index)).join('')}
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function getTaskHTML(task, isDone, index) {
+            const delay = index * 0.05; // Staggered animation
+
+            // Priority Styling
+            let pColor = 'text-blue-400 border-blue-500/20 bg-blue-500/5';
+            let glow = 'group-hover:border-blue-500/40';
+
+            if (task.priority >= 8) {
+                pColor = 'text-red-400 border-red-500/20 bg-red-500/5';
+                glow = 'group-hover:border-red-500/40 group-hover:shadow-[0_0_20px_rgba(239,68,68,0.1)]';
+            } else if (task.priority >= 5) {
+                pColor = 'text-orange-400 border-orange-500/20 bg-orange-500/5';
+                glow = 'group-hover:border-orange-500/40 group-hover:shadow-[0_0_20px_rgba(249,115,22,0.1)]';
+            }
+
+            const statusLabel = task.status === 'rejected'
+                ? '<span class="text-red-500 text-xs font-bold tracking-wider uppercase border border-red-900/50 px-2 py-1 rounded bg-red-900/20">Rejected</span>'
+                : '<span class="text-emerald-500 text-xs font-bold tracking-wider uppercase border border-emerald-900/50 px-2 py-1 rounded bg-emerald-900/20">Completed</span>';
+
+            return `
+                <div class="glass p-6 rounded-2xl mb-4 transition-all duration-300 border border-gray-800 relative group animate-slide-up ${glow}" style="animation-delay: ${delay}s">
+                    <div class="flex flex-col md:flex-row justify-between items-start gap-4">
+                        <div class="flex-1 w-full">
+                            <div class="flex flex-wrap items-center gap-3 mb-3">
+                                <span class="px-2.5 py-1 rounded-md text-xs font-bold font-mono border ${pColor}">
                                     P${task.priority}
                                 </span>
-                                <span class="text-xs text-gray-500 font-mono">${task.time}</span>
+                                <span class="text-xs text-gray-500 font-mono flex items-center gap-1">
+                                    <svg class="w-3 h-3 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    ${task.time}
+                                </span>
                                 ${task.deadline ?
-                        `<span class="px-2 py-0.5 rounded text-xs font-bold border text-orange-400 border-orange-500/30 bg-orange-500/10 flex items-center gap-1">
+                    `<span class="px-2 py-1 rounded-md text-xs font-semibold border text-amber-400 border-amber-500/20 bg-amber-500/5 flex items-center gap-1">
                                         📅 ${task.deadline}
                                     </span>` : ''}
-                                <span class="text-xs text-gray-400 flex items-center gap-1 bg-gray-900/50 px-2 py-0.5 rounded border border-gray-800">
-                                    👤 ${task.sender} <span class="text-gray-600">(${task.user_id || 'ID Hidden'})</span>
+                                <span class="text-xs text-gray-400 flex items-center gap-1 bg-gray-900/80 px-2 py-1 rounded border border-gray-800/80">
+                                    👤 ${task.sender}
                                 </span>
                             </div>
-                            <h3 class="text-lg font-medium text-gray-200">${task.summary}</h3>
+                            
+                            <h3 class="text-lg md:text-xl font-medium text-gray-200 leading-relaxed ${isDone ? 'line-through text-gray-600' : ''}">
+                                ${task.summary}
+                            </h3>
+                            
+                            ${task.link && task.link.startsWith('http') ? `
+                                <a href="${task.link}" target="_blank" class="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 mt-2 transition-colors opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 duration-300">
+                                    View Context ↗
+                                </a>
+                            ` : ''}
                         </div>
-                        <div class="flex items-center gap-3">
-                            ${task.link && task.link.startsWith('http') ?
-                        `<a href="${task.link}" target="_blank" class="p-2 text-gray-400 hover:text-white transition-colors" title="View Message">
-                                    🔗
-                                </a>` : ''}
-                            <button onclick="markDone('${task.id}')" 
-                                class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-blue-900/20">
-                                Mark Done
+                        
+                        <div class="flex items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
+                            ${!isDone ? `
+                            <button onclick="markDone('${task.id}')"
+                                class="flex-1 md:flex-none px-5 py-2.5 bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white text-sm font-medium rounded-xl transition-all shadow-lg shadow-blue-900/30 hover:shadow-blue-900/50 hover:scale-[1.02] active:scale-95">
+                                Done
                             </button>
+                            <button onclick="rejectTask('${task.id}')"
+                                class="flex-1 md:flex-none px-5 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-sm font-medium rounded-xl transition-all border border-gray-700 hover:border-gray-600 hover:scale-[1.02] active:scale-95">
+                                Reject
+                            </button>` :
+                    `
+                            <div class="flex items-center gap-3">
+                                ${statusLabel}
+                                <button onclick="reopenTask('${task.id}')" title="Reopen Task"
+                                    class="p-2 text-gray-500 hover:text-white bg-gray-800/50 hover:bg-gray-700 rounded-lg transition-colors border border-gray-800 hover:border-gray-600">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+                                </button>
+                            </div>
+                            `
+                }
                         </div>
                     </div>
                 </div>
-                `;
-            }).join('');
+            `;
         }
 
         // Initial load
