@@ -73,6 +73,21 @@ NOTION_DATABASE_ID=a8aec4...2e089
 SESSION_STRING=...
 ```
 
+### 3. Telegram Session Login
+To allow the agent to run on your behalf without constant logins (and to support 2FA), you must generate a **Session String**.
+
+1.  **Run the Generator**:
+    ```bash
+    python generate_session.py
+    ```
+2.  **Authenticate**:
+    - Enter your phone number (international format, e.g., `+1234567890`).
+    - Enter the **OTP code** sent to your Telegram account.
+    - (If enabled) Enter your 2FA Password.
+3.  **Update Config**:
+    - The script will output a long string. Copy it **entirely**.
+    - Paste it into your `.env` file as the value for `SESSION_STRING`.
+
 ---
 
 ## 🧠 How it Works: Monitoring logic

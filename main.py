@@ -3,6 +3,13 @@ import logging
 import uvicorn
 # Load Config & Env FIRST
 from config import API_ID, API_HASH
+
+# Fix for Pyrogram import in Python 3.14+ (requires event loop for sync wrapper)
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
 from listener import start_listener, tm, app as client_app
 import server
 import pyrogram
