@@ -1,14 +1,21 @@
 import asyncio
 import logging
 import uvicorn
+# Load Config & Env FIRST
+from config import API_ID, API_HASH
 from listener import start_listener, tm, app as client_app
 import server
-from config import API_ID, API_HASH
 import pyrogram
 
-logging.basicConfig(level=logging.DEBUG)
-# Suppress uvicorn access logs to keep terminal clean
+# Configure Logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 logging.getLogger("uvicorn.access").setLevel(logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 async def on_task_done(summary: str):

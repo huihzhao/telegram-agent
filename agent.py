@@ -32,9 +32,11 @@ class Agent:
 
         # Load Prompt from File for easy management
         try:
+            from jinja2 import Template
             with open("system_prompt.txt", "r") as f:
-                template = f.read()
-                prompt = template.format(memory_text=memory_text, message_text=message_text)
+                template_str = f.read()
+                template = Template(template_str)
+                prompt = template.render(memory_text=memory_text, message_text=message_text)
         except Exception as e:
             logger.error(f"Failed to load system_prompt.txt: {e}")
             # Fallback (Generic)

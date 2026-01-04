@@ -3,6 +3,7 @@ from config import API_ID, API_HASH, SESSION_STRING
 from agent import Agent
 from task_manager import TaskManager
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,59 @@ async def message_handler(client, message):
         except Exception as e:
             logger.error(f"Failed to add task or reply: {e}")
 
+async def send_daily_briefing(app: Client, tm: TaskManager):
+    """Sends a daily summary of top tasks."""
+    logger.info("Generating Daily Briefing...")
+    data = tm.get_daily_briefing_tasks()
+    
+    if not data['top_tasks'] and not data['deadline_tasks']:
+        # Send a "All Clear" message instead of silence, so user knows it ran
+        text = "☀️ **Good Morning!**\n\n✅ **You have Zero Active Tasks.**\nEnjoy your day! details at http://localhost:8000"
+        try:
+            await app.send_message("me", text)
+            logger.info("Daily Briefing Sent (Empty).")
+        except Exception as e:
+            logger.error(f"Failed to send briefing: {e}")
+        return
+
+    text = "☀️ **Good Morning! Here is your Daily Briefing:**\n\n"
+    
+    if data['top_tasks']:
+        text += "**🔥 Top Priorities:**\n"
+        for t in data['top_tasks']:
+            text += f"- (P{t['priority']}) {t['summary']}\n"
+    
+    if data['deadline_tasks']:
+        text += "\n**📅 Upcoming Deadlines:**\n"
+        for t in data['deadline_tasks']:
+             text += f"- {t['summary']} ({t.get('deadline')})\n"
+             
+    text += "\n*Check Dashboard: http://localhost:8000*"
+    
+    # Send to Saved Messages (Me)
+    try:
+        await app.send_message("me", text)
+        logger.info("Daily Briefing Sent.")
+    except Exception as e:
+        logger.error(f"Failed to send briefing: {e}")
+
+async def scheduler(app: Client, tm: TaskManager):
+    """Simple loop to check time and send briefing."""
+    # Send one immediately on startup for testing/engagement
+    await asyncio.sleep(5) # Wait for connection
+    await send_daily_briefing(app, tm)
+    
+    logger.info("Scheduler started.")
+    while True:
+        # Loop every hour to check if it's 9am
+        # For production use apscheduler, but this is fine for MVP
+        import datetime
+        now = datetime.datetime.now()
+        if now.hour == 9 and now.minute == 0:
+             await send_daily_briefing(app, tm)
+             await asyncio.sleep(61) # Sleep past the minute
+        await asyncio.sleep(50)
+
 
 
 
@@ -137,6 +191,9 @@ async def start_listener():
 
     # Start the client
     await app.start()
+    
+    # Start Scheduler
+    asyncio.create_task(scheduler(app, tm))
     
     # Init Keywords
     me = await app.get_me()

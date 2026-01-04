@@ -1,36 +1,34 @@
 # Telegram Intelligence Agent 🧠
 
-A local AI-powered agent that monitors your Telegram messages, learns your habits, and organizes actionable items into a premium local dashboard.
+A local AI-powered agent that monitors your Telegram messages, learns your habits, and organizes actionable items into a premium local dashboard, synced directly to **Notion**.
 
 ## ✨ Features
 
 ### 🧠 Intelligent Analysis
-- **Smart Monitoring**: Listens to "Saved Messages", DMs, **Mentions**, **Replies**, and **Keyword Triggers** (e.g., your name).
+- **Smart Monitoring**: Listens to "Saved Messages", DMs, **Mentions**, **Replies**, and **Keyword Triggers**.
 - **Gemini 2.0 Powered**: Analyzes context, importance, and deadlines.
-- **Long-Term Memory**:
-  - **Context Aware**: Checks your last 5 completed tasks to avoid duplicates.
-  - **Habit Learning**: Learns from your "Rejected" tasks to ignore similar future requests.
-  - **Sender Reputation**: Builds trust based on who sends you accepted vs. rejected tasks.
+- **Context Aware**: Checks your Notion database to avoid duplicates.
+
+### 📚 Notion Integration (SSOT)
+- **Single Source of Truth**: All tasks are stored directly in a Notion Database.
+- **Two-Way Sync**:
+  - **Telegram -> Notion**: New tasks appear instantly.
+  - **Dashboard -> Notion**: Updates (Done, Reject, Reopen) reflect instantly.
+- **Robust API**: Uses efficient Search and UUID handling for reliability.
 
 ### 📊 Premium Dashboard 2.0
 - **Modern UI**: Dark mode, glassmorphism, and smooth animations.
-- **Task Management**:
-  - **Active**: View and manage pending tasks.
-  - **History**: Archive of Done and Rejected tasks.
-  - **Undo**: Reopen any completed or rejected task instantly.
+- **Real-Time**: Fetches live data from Notion.
 - **Visual Cues**: Priority badges, deadlines, and sender info.
-
-### ⚙️ Core Reliability
-- **Persistence**: Tasks are saved to `tasks.json` and survive restarts.
-- **Performance**: In-memory session management prevents database locks.
-- **Privacy**: Runs locally on your machine.
+- **Daily Briefing**: Sends a summary of Top Tasks to your **Saved Messages** every morning.
 
 ## 🚀 Installation
 
 ### Prerequisites
 - Python 3.10+
-- A Telegram Account
+- Telegram Account
 - [Google AI Studio API Key](https://aistudio.google.com/)
+- [Notion Integration Token](https://www.notion.so/my-integrations)
 
 ### 1. Clone & Setup
 ```bash
@@ -47,20 +45,17 @@ Create a `.env` file in the root directory:
 API_ID=your_telegram_api_id
 API_HASH=your_telegram_api_hash
 GENAI_KEY=your_gemini_api_key
-SESSION_STRING=  # Leave empty initially
+NOTION_TOKEN=your_notion_integration_token
+NOTION_DATABASE_ID=your_notion_database_id
+SESSION_STRING=  # Generated in Step 3
 ```
-*Get your Telegram credentials from [my.telegram.org](https://my.telegram.org).*
+*See `notion_setup_guide.md` for detailed Notion configuration.*
 
 ### 3. Generate Session String (One-time)
-To avoid local database issues and file locking, we use a Session String.
-Run the generator script and follow the login prompts:
 ```bash
 python generate_session.py
 ```
-Copy the output string and paste it into your `.env`:
-```bash
-SESSION_STRING=your_long_session_string_here
-```
+Paste the output into `SESSION_STRING` in your `.env`.
 
 ## 🏃‍♂️ Usage
 
@@ -70,25 +65,18 @@ python main.py
 ```
 
 **How to use:**
-1. **Send a message** (e.g., "Remind me to buy milk") to your Saved Messages.
-   - *Or ask a friend to rely to you in a group.*
+1. **Send a message** (e.g., "Buy coffee") to your Saved Messages.
 2. **View the Dashboard**: Go to **http://localhost:8000**.
-3. **Manage Tasks**:
-   - Click **Done** to complete.
-   - Click **Reject** to teach the AI you don't want this.
-   - Click **Reopen** to undo.
-
-**Stop the Agent:**
-Press `Ctrl+C`. The persistent storage ensures no data is lost.
+3. **Manage Tasks**: Click Done/Reject/Reopen. Updates sync to Notion instantly.
 
 ## 🏗️ Architecture
 
-- **`main.py`**: Orchestrator. Runs `listener` and `server` concurrently.
-- **`listener.py`**: Telegram Client (Pyrogram). Handles message events, filters, and passes memory context.
-- **`agent.py`**: Intelligence Engine. Calls Gemini API with memory-augmented prompts (`analyze_message`).
-- **`server.py`**: FastAPI backend serving the Dashboard and API endpoints.
-- **`task_manager.py`**: Handles storage, persistence (`tasks.json`), and retrieval logic.
-- **`templates/dashboard.html`**: Premium Single-Page Application (HTML/JS/TailwindCSS).
+- **`main.py`**: Orchestrator running concurrent Listener and Server.
+- **`listener.py`**: Telegram Client (Pyrogram). Handles messages and AI analysis.
+- **`agent.py`**: Intelligence Engine. Uses `system_prompt.txt` (Jinja2) to prompt Gemini.
+- **`notion_sync.py`**: Handling all Notion API interactions (Search, Create, Update).
+- **`task_manager.py`**: Stateless proxy directing all calls to `NotionSync`.
+- **`server.py`**: FastAPI backend for the Dashboard.
 
 ## 🛡️ Security Note
-This agent runs **locally**. Your credentials and session data are stored only on your machine (or in your `.env`). No data is sent to third-party servers other than Telegram (connection) and Google (content analysis).
+This agent runs **locally**. Your credentials stay on your machine. Data flows only between Telegram, Google (analysis), and Notion (storage).

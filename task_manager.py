@@ -1,104 +1,88 @@
 from datetime import datetime
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import logging
+from notion_sync import NotionSync
 
 logger = logging.getLogger(__name__)
 
-import json
-import os
-
 class TaskManager:
     def __init__(self, storage_file="tasks.json"):
-        self.storage_file = storage_file
-        # List of dictionaries: { "id": str, "priority": int, "summary": str, "sender": str, "link": str, "time": str }
-        self.tasks = self.load_tasks()
-
-    def load_tasks(self):
-        """Loads tasks from the JSON file."""
-        if not os.path.exists(self.storage_file):
-            return []
-        try:
-            with open(self.storage_file, "r") as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"Failed to load tasks: {e}")
-            return []
-
-    def save_tasks(self):
-        """Saves current tasks to the JSON file."""
-        try:
-            with open(self.storage_file, "w") as f:
-                json.dump(self.tasks, f, indent=4)
-        except Exception as e:
-            logger.error(f"Failed to save tasks: {e}")
-
+        # Storage file argument kept for compatibility but ignored
+        self.notion_sync = NotionSync()
+        
     def add_task(self, priority: int, summary: str, sender: str, link: str, deadline: str = None, user_id: int = None):
-        """Adds a new task to the list and sorts by priority."""
-        logger.info(f"Adding task: {summary}")
-        task_id = f"task_{int(datetime.now().timestamp() * 1000)}"
-        new_task = {
-            "id": task_id,
-            "priority": priority,
+        """Adds a new task directly to Notion."""
+        logger.info(f"Adding task to Notion: {summary}")
+        
+        task_data = {
             "summary": summary,
+            "priority": priority,
             "sender": sender,
-            "user_id": user_id,
             "link": link,
-            "deadline": deadline,
             "status": "active",
-            "time": datetime.now().strftime("%I:%M %p")
+            "deadline": deadline # NotionSync needs to handle this if property exists
         }
-        self.tasks.append(new_task)
-        # Sort by priority (descending)
-        self.tasks.sort(key=lambda x: x["priority"], reverse=True)
-        self.save_tasks()
-        return new_task
+        
+        page_id = self.notion_sync.create_task_page(task_data)
+        
+        # Return a mock task object for immediate UI feedback if needed, 
+        # though the dashboard should re-fetch.
+        return {
+            "id": page_id,
+            "summary": summary,
+            "priority": priority,
+            "status": "active"
+        }
 
     def mark_done(self, task_id: str):
-        """Marks a task as done instead of removing it."""
+        """Updates Notion status to Done."""
         logger.info(f"Marking task done: {task_id}")
-        for task in self.tasks:
-            if task["id"] == task_id:
-                task["status"] = "done"
-                break
-        self.save_tasks()
+        self.notion_sync.update_task_status(task_id, 'done')
 
     def reject_task(self, task_id: str):
-        """Marks a task as rejected."""
+        """Updates Notion status to Rejected."""
         logger.info(f"Marking task rejected: {task_id}")
-        for task in self.tasks:
-            if task["id"] == task_id:
-                task["status"] = "rejected"
-                break
-        self.save_tasks()
+        self.notion_sync.update_task_status(task_id, 'rejected')
 
     def reopen_task(self, task_id: str):
-        """Marks a task as active again."""
+        """Updates Notion status to Active."""
         logger.info(f"Reopening task: {task_id}")
-        for task in self.tasks:
-            if task["id"] == task_id:
-                task["status"] = "active"
-                break
-        self.save_tasks()
+        self.notion_sync.update_task_status(task_id, 'active')
 
-    def remove_task(self, task_id: str):
-         # Kept for compatibility but redirects to mark_done per user request
-         self.mark_done(task_id)
-
-    # Web Dashboard handles rendering now
     def get_tasks(self):
-        return self.tasks
+        """Fetches tasks directly from Notion."""
+        return self.notion_sync.get_tasks()
 
     def get_recent_done_tasks(self, limit: int = 5):
-        """Returns the most recently completed tasks."""
-        done_tasks = [t for t in self.tasks if t.get("status") == "done"]
-        return done_tasks[-limit:]
+        """Returns most recently completed tasks from Notion."""
+        all_tasks = self.get_tasks()
+        done_tasks = [t for t in all_tasks if t.get("status") == "done"]
+        # Notion returns unsorted or sorted by priority? We requested sort by priority.
+        # Ideally we sort by updated time but for now just slice.
+        return done_tasks[:limit]
 
     def get_preference_examples(self, limit: int = 5):
         """Returns lists of recent accepted vs rejected tasks for AI learning."""
-        # Return dicts with summary and sender
-        accepted = [{"summary": t['summary'], "sender": t.get("sender", "Unknown")} for t in self.tasks if t.get("status") == "done"][-limit:]
-        rejected = [{"summary": t['summary'], "sender": t.get("sender", "Unknown")} for t in self.tasks if t.get("status") == "rejected"][-limit:]
+        all_tasks = self.get_tasks()
+        accepted = [{"summary": t['summary'], "sender": t.get("sender", "Unknown")} for t in all_tasks if t.get("status") == "done"][:limit]
+        rejected = [{"summary": t['summary'], "sender": t.get("sender", "Unknown")} for t in all_tasks if t.get("status") == "rejected"][:limit]
         return {
             "accepted": accepted,
             "rejected": rejected
+        }
+
+    def get_daily_briefing_tasks(self):
+        """Returns top priority tasks for daily digest."""
+        all_tasks = self.get_tasks()
+        active_tasks = [t for t in all_tasks if t.get("status") == "active"]
+        
+        # Already sorted by priority in Notion query, but let's ensure
+        sorted_tasks = sorted(active_tasks, key=lambda x: x.get("priority", 0), reverse=True)
+        top_tasks = sorted_tasks[:3]
+        
+        # TODO: Implement proper deadline parsing later
+        deadline_tasks = [t for t in active_tasks if t.get("deadline")]
+        
+        return {
+            "top_tasks": top_tasks,
+            "deadline_tasks": deadline_tasks
         }

@@ -1,10 +1,10 @@
 You are a personal assistant. Analyze the following Chat History.
 
 Recent Finished Tasks (Memory):
-{memory_text}
+{{ memory_text }}
 
 Chat Context:
-{message_text}
+{{ message_text }}
 
 Task:
 1. Context: The last message in the history is the "Trigger".
