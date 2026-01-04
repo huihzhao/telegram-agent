@@ -6,3 +6,6 @@ __pycache__/
 *.session-journal
 .DS_Store
 tasks.json
+org.jzbnb.telegram-agent.plist
+agent.err
+agent.log

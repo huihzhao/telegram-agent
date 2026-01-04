@@ -21,3 +21,7 @@
     - [x] Verify SSOT (No local tasks.json)
 - [ ] **Multi-Modal Support**: Analyze Photos & Voice Notes
 - [ ] **Two-Way Actions**: Auto-Replies & Command Execution
+- [x] **Startup Catch-Up Mechanism**: Process missed messages on boot
+    - [x] Refactor filter logic into reusable function
+    - [x] Implement `run_catch_up()` (Scan DMs, Groups, Saved Messages)
+    - [x] Integrate into startup sequence
