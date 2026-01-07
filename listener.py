@@ -65,6 +65,15 @@ async def message_handler(client, message):
     analysis = await intelligence_agent.analyze_message(context_text, sender, memory_text)
     logger.info(f"Analysis: {analysis}")
 
+    # LOG AUDIT
+    try:
+        await tm.log_audit(
+            message_data={"sender": sender, "text": message.text or "[Media/No Text]"},
+            evaluation=analysis
+        )
+    except Exception as e:
+        logger.error(f"Audit log failed: {e}")
+
     # Add to Task Manager if Priority <= 3 (0=Crit, 1=High, 2=Med, 3=Low) or Action Required
     # Priority 4 is Noise
     if analysis.get('priority', 4) <= 3 or analysis.get('action_required', False):

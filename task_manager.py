@@ -128,3 +128,39 @@ class TaskManager:
     async def update_priority(self, task_id, priority):
         """Updates the priority of a task."""
         return await self.notion_sync.update_task_priority(task_id, priority)
+
+    async def log_audit(self, message_data, evaluation):
+        """Logs an AI evaluation to a local JSON file for auditing."""
+        import json
+        
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "sender": message_data.get("sender"),
+            "text": message_data.get("text"),
+            "evaluation": evaluation
+        }
+        
+        # Load existing log
+        log_file = "audit_log.json"
+        try:
+            with open(log_file, 'r') as f:
+                logs = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            logs = []
+            
+        logs.insert(0, entry)
+        # Keep last 500 entries
+        logs = logs[:500]
+        
+        with open(log_file, 'w') as f:
+            json.dump(logs, f, indent=2)
+
+    async def get_audit_log(self, limit=100):
+        """Returns the audit log."""
+        import json
+        try:
+            with open("audit_log.json", 'r') as f:
+                logs = json.load(f)
+                return logs[:limit]
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []

@@ -117,3 +117,30 @@ async def update_priority(task_id: str, request: dict):
         return {"status": "success", "task": task_id, "priority": priority}
     return JSONResponse(status_code=500, content={"error": "Failed to update priority"})
 
+
+@app.get("/api/audit")
+async def get_audit_log():
+    if not task_manager: return []
+    return await task_manager.get_audit_log()
+
+class CreateTaskRequest(BaseModel):
+    summary: str
+    priority: int
+    sender: str
+    link: str = None
+    deadline: str = None
+
+@app.post("/api/tasks/create")
+async def create_task_manual(request: CreateTaskRequest):
+    if not task_manager:
+        return JSONResponse(status_code=500, content={"error": "TaskManager not initialized"})
+        
+    result = await task_manager.add_task(
+        priority=request.priority,
+        summary=request.summary,
+        sender=request.sender,
+        link=request.link,
+        deadline=request.deadline
+    )
+    return result
+

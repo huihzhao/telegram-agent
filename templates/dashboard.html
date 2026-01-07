@@ -127,6 +127,10 @@
                     class="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-all cursor-pointer">
                     Discussion History
                 </button>
+                <button id="tab-audit" onclick="switchTab('audit')"
+                    class="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-all cursor-pointer">
+                    Daily Audit
+                </button>
             </div>
 
             <div id="task-container" class="space-y-6">
@@ -154,13 +158,19 @@
         // Tab Switching
         function switchTab(tab) {
             activeTab = tab;
-            document.getElementById('tab-tasks').className = tab === 'tasks' ? 'px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-lg transition-all' : 'px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-all cursor-pointer';
-            document.getElementById('tab-discussions').className = tab === 'discussions' ? 'px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-lg transition-all' : 'px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-all cursor-pointer';
+            const btnClassActive = 'px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-lg transition-all shadow-lg shadow-gray-900/20';
+            const btnClassInactive = 'px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-all cursor-pointer';
+
+            document.getElementById('tab-tasks').className = tab === 'tasks' ? btnClassActive : btnClassInactive;
+            document.getElementById('tab-discussions').className = tab === 'discussions' ? btnClassActive : btnClassInactive;
+            document.getElementById('tab-audit').className = tab === 'audit' ? btnClassActive : btnClassInactive;
 
             if (tab === 'tasks') {
                 renderTasks(currentTasks);
-            } else {
+            } else if (tab === 'discussions') {
                 fetchHistory(); // Fetch on demand
+            } else if (tab === 'audit') {
+                fetchAudit(); // Fetch on demand
             }
         }
 
@@ -191,6 +201,56 @@
                 renderHistory(history);
             } catch (error) {
                 console.error('Error fetching history:', error);
+            }
+        }
+
+        async function fetchAudit() {
+            try {
+                const response = await fetch('/api/audit');
+                const logs = await response.json();
+                renderAudit(logs);
+            } catch (error) {
+                console.error('Error fetching audit:', error);
+            }
+        }
+
+        function toggleAuditEdit(index) {
+            const edit = document.getElementById(`audit-edit-${index}`);
+            if (edit.classList.contains('hidden')) {
+                edit.classList.remove('hidden');
+                edit.classList.add('flex');
+            } else {
+                edit.classList.add('hidden');
+                edit.classList.remove('flex');
+            }
+        }
+
+        async function createManualTaskFiltered(index) {
+            const log = currentAudit[index];
+            const summaryInput = document.getElementById(`audit-summary-${index}`).value;
+            const priorityInput = parseInt(document.getElementById(`audit-priority-${index}`).value);
+
+            try {
+                const response = await fetch('/api/tasks/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        summary: summaryInput,
+                        priority: priorityInput,
+                        sender: log.sender || "Unknown",
+                        deadline: log.evaluation.deadline
+                    })
+                });
+                if (response.ok) {
+                    showToast('Task Created Successfully', 'success');
+                    toggleAuditEdit(index);
+                    const btn = document.getElementById(`audit-action-btn-${index}`);
+                    if (btn) btn.outerHTML = '<div class="text-xs text-green-500 font-mono">Synced</div>';
+                } else {
+                    showToast('Failed to create task', 'error');
+                }
+            } catch (e) {
+                showToast('Error creating task', 'error');
             }
         }
 
@@ -230,6 +290,90 @@
                 </div>`;
             }).join('');
 
+            container.innerHTML = html;
+        }
+
+        let currentAudit = [];
+        function renderAudit(logs) {
+            currentAudit = logs;
+            const container = document.getElementById('task-container');
+
+            if (logs.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-20 glass rounded-2xl animate-fade-in">
+                         <h3 class="text-xl font-medium text-gray-200">No Audit Logs</h3>
+                         <p class="text-gray-500 text-sm mt-1">AI evaluations will appear here.</p>
+                    </div>`;
+                return;
+            }
+
+            let html = `
+                <div class="flex items-center gap-4 mb-6 mt-2 animate-fade-in">
+                    <h2 class="text-xl font-semibold text-white">Evaluation Audit Log (Last 24h)</h2>
+                    <div class="h-[1px] flex-1 bg-gradient-to-r from-gray-700 to-transparent"></div>
+                </div>
+                <div class="space-y-4">`;
+
+            html += logs.map((log, index) => {
+                const date = new Date(log.timestamp).toLocaleTimeString();
+                const prio = log.evaluation.priority;
+                const isNoise = prio === 4;
+                const isCrit = prio === 0;
+
+                let borderColor = isNoise ? 'border-gray-800' : 'border-blue-900/50';
+                if (isCrit) borderColor = 'border-red-900/50';
+
+                let badgeClass = 'bg-gray-800 text-gray-400';
+                if (prio === 0) badgeClass = 'bg-red-900/20 text-red-400 border border-red-500/20';
+                else if (prio === 1) badgeClass = 'bg-orange-900/20 text-orange-400 border border-orange-500/20';
+                else if (prio === 2) badgeClass = 'bg-amber-900/20 text-amber-400 border border-amber-500/20';
+                else if (prio === 3) badgeClass = 'bg-blue-900/20 text-blue-400 border border-blue-500/20';
+
+                return `
+                <div class="glass p-4 rounded-xl border ${borderColor} flex flex-col gap-2 animate-slide-up" style="animation-delay: ${index * 0.05}s">
+                    <div id="audit-row-${index}" class="flex gap-4 items-start w-full">
+                        <div class="min-w-[60px] text-xs font-mono text-gray-500 pt-1">${date}</div>
+                        
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="text-sm font-bold text-gray-300">${log.sender}</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-mono uppercase ${badgeClass}">P${prio}</span>
+                            </div>
+                            <p class="text-gray-400 text-xs italic mb-2">"${log.text.substring(0, 100)}${log.text.length > 100 ? '...' : ''}"</p>
+                            <p class="text-gray-200 text-sm">🤖 ${log.evaluation.summary}</p>
+                        </div>
+
+                        ${isNoise ? `
+                        <button id="audit-action-btn-${index}" onclick="toggleAuditEdit(${index})" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded border border-gray-700 transition-colors">
+                            Review
+                        </button>` : '<div class="text-xs text-green-500 font-mono">Synced</div>'}
+                    </div>
+
+                    <!-- Edit Panel (Hidden) -->
+                    <div id="audit-edit-${index}" class="hidden w-full bg-gray-900/50 p-3 rounded-lg border border-gray-700 mt-2 flex-col gap-3">
+                        <div class="flex gap-2 w-full">
+                            <input type="text" id="audit-summary-${index}" value="${log.evaluation.summary || ''}" 
+                                class="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-blue-500 focus:outline-none placeholder-gray-600"
+                                placeholder="Edit Summary..."
+                            >
+                            <select id="audit-priority-${index}" class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-blue-500 focus:outline-none">
+                                <option value="0">P0 (Crit)</option>
+                                <option value="1">P1 (High)</option>
+                                <option value="2" selected>P2 (Med)</option>
+                                <option value="3">P3 (Low)</option>
+                            </select>
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button onclick="toggleAuditEdit(${index})" class="px-3 py-1 text-xs text-gray-400 hover:text-white">Cancel</button>
+                            <button onclick="createManualTaskFiltered(${index})" class="px-3 py-1 bg-green-600 hover:bg-green-500 text-white text-xs rounded shadow-lg shadow-green-900/20">
+                                Create Task
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            html += '</div>';
             container.innerHTML = html;
         }
 
