@@ -77,8 +77,19 @@ class TaskManager:
     async def get_preference_examples(self, limit: int = 5):
         """Returns lists of recent accepted vs rejected tasks for AI learning."""
         all_tasks = await self.get_tasks()
-        accepted = [{"summary": t['summary'], "sender": t.get("sender", "Unknown")} for t in all_tasks if t.get("status") == "done"][:limit]
-        rejected = [{"summary": t['summary'], "sender": t.get("sender", "Unknown")} for t in all_tasks if t.get("status") == "rejected"][:limit]
+        accepted = [{
+            "summary": t['summary'], 
+            "sender": t.get("sender", "Unknown"),
+            "priority": t.get("priority", 3),
+            "comments": [c['text'] for c in t.get("comments", [])]
+        } for t in all_tasks if t.get("status") == "done"][:limit]
+        
+        rejected = [{
+            "summary": t['summary'], 
+            "sender": t.get("sender", "Unknown"),
+            "priority": t.get("priority", 3),
+            "comments": [c['text'] for c in t.get("comments", [])]
+        } for t in all_tasks if t.get("status") == "rejected"][:limit]
         return {
             "accepted": accepted,
             "rejected": rejected

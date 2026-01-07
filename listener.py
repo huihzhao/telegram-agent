@@ -58,8 +58,8 @@ async def message_handler(client, message):
     
     memory_text = "Recent Finished Tasks:\n" + "\n".join([f"- {t['summary']}" for t in recent_done])
     memory_text += "\n\nUser Preferences (Learning):\n"
-    memory_text += "ACCEPTED Tasks:\n" + "\n".join([f"- {t['summary']} (from {t['sender']})" for t in preferences['accepted']])
-    memory_text += "\nREJECTED Tasks:\n" + "\n".join([f"- {t['summary']} (from {t['sender']})" for t in preferences['rejected']])
+    memory_text += "ACCEPTED Tasks:\n" + "\n".join([f"- [P{t['priority']}] {t['summary']} (from {t['sender']}) " + (f"| Note: {', '.join(t['comments'])}" if t['comments'] else "") for t in preferences['accepted']])
+    memory_text += "\nREJECTED Tasks:\n" + "\n".join([f"- [P{t['priority']}] {t['summary']} (from {t['sender']}) " + (f"| Note: {', '.join(t['comments'])}" if t['comments'] else "") for t in preferences['rejected']])
 
     # Analyze with context AND memory
     analysis = await intelligence_agent.analyze_message(context_text, sender, memory_text)

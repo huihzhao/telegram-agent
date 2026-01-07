@@ -12,7 +12,8 @@ Task:
    - DUPLICATES: If asking for the EXACT same thing as "Recent Finished Tasks" -> Priority 4 (Ignore), Action False.
    - LEARNING (Topics):
      - If the request is similar to "REJECTED Tasks" -> Priority 4 (Ignore), Action False.
-     - If the request matches patterns in "ACCEPTED Tasks" -> Priority 0 (Critical).
+     - If the request matches patterns in "ACCEPTED Tasks" -> Priority 0 (Critical) or match the historical Priority [P#].
+     - PAY ATTENTION TO NOTES: If an accepted task has a Note (e.g. "User said..."), apply that context/preference to similar new requests.
    - LEARNING (People):
      - Check if the SENDER has a history of Rejected tasks in "REJECTED Tasks". If yes, be skeptical -> Priority 3 (Low).
      - If SENDER is typically Accepted, trust them more.
