@@ -53,8 +53,8 @@ async def message_handler(client, message):
     context_text = "\n".join(history)
 
     # Get Memory & Learning Context
-    recent_done = tm.get_recent_done_tasks(limit=5)
-    preferences = tm.get_preference_examples(limit=5)
+    recent_done = await tm.get_recent_done_tasks(limit=5)
+    preferences = await tm.get_preference_examples(limit=5)
     
     memory_text = "Recent Finished Tasks:\n" + "\n".join([f"- {t['summary']}" for t in recent_done])
     memory_text += "\n\nUser Preferences (Learning):\n"
@@ -76,7 +76,7 @@ async def message_handler(client, message):
             except Exception:
                 pass
                 
-            tm.add_task(
+            task_result = await tm.add_task(
                 priority=analysis.get('priority', 0),
                 summary=analysis.get('summary', 'No summary'),
                 sender=sender,
@@ -84,6 +84,11 @@ async def message_handler(client, message):
                 deadline=analysis.get('deadline'),
                 user_id=message.chat.id
             )
+            
+            if not task_result.get("is_new", True):
+                logger.info(f"Task already exists: {safe_link}. Skipping notification.")
+                return
+
             # Notify user (Silent Mode: Only to Saved Messages)
             notification_text = f"✅ **Task Added from {sender}**\nPriority: {analysis.get('priority', 0)}\nSummary: {analysis.get('summary', 'No summary')}\nLink: {safe_link}"
             
@@ -142,7 +147,7 @@ async def send_daily_briefing(app: Client, tm: TaskManager):
     logger.info("Generating Daily Briefing...")
     
     # Part 1: Tasks
-    data = tm.get_daily_briefing_tasks()
+    data = await tm.get_daily_briefing_tasks()
     task_text = ""
     
     if data['top_tasks']:
@@ -256,7 +261,7 @@ async def run_catch_up(app: Client, dynamic_keywords):
     logger.info("♻️ Running Startup Catch-Up...")
     
     # 0. Pre-fetch existing tasks for Deduplication
-    existing_tasks = tm.get_tasks()
+    existing_tasks = await tm.get_tasks()
     existing_links = set()
     for t in existing_tasks:
         if t.get('link'):

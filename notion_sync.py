@@ -1,4 +1,4 @@
-from notion_client import Client
+from notion_client import AsyncClient
 import logging
 import os
 
@@ -20,19 +20,15 @@ class NotionSync:
             if len(self.database_id) == 32 and "-" not in self.database_id:
                 self.database_id = f"{self.database_id[:8]}-{self.database_id[8:12]}-{self.database_id[12:16]}-{self.database_id[16:20]}-{self.database_id[20:]}"
                 
-        token = os.getenv("NOTION_TOKEN")
-        
-        if token and self.database_id:
-            try:
-                self.notion = Client(auth=token)
-                logger.info("Notion Client initialized.")
-            except Exception as e:
-                logger.error(f"Failed to init Notion Client: {e}")
+        self.token = os.getenv("NOTION_TOKEN")
+        if self.token and self.database_id:
+            self.notion = AsyncClient(auth=self.token)
+            logger.info("Notion AsyncClient initialized.")
         else:
             logger.warning("NOTION_TOKEN or NOTION_DATABASE_ID missing. Sync disabled.")
 
-    def create_task_page(self, task):
-        """Creates a page in the database."""
+    async def create_task_page(self, task):
+        """Creates a page in the database asynchronously."""
         if not self.notion or not self.database_id: return None
 
         try:
@@ -46,7 +42,7 @@ class NotionSync:
             }
             status_val = status_map.get(task.get("status", "active"), "Active")
 
-            new_page = self.notion.pages.create(
+            new_page = await self.notion.pages.create(
                 parent={"database_id": self.database_id},
                 properties={
                     "Name": {
@@ -73,8 +69,8 @@ class NotionSync:
             logger.error(f"Failed to sync to Notion: {e}")
             return None
 
-    def update_task_status(self, page_id, status):
-        """Updates the status select property."""
+    async def update_task_status(self, page_id, status):
+        """Updates the status select property asynchronously."""
         if not self.notion or not page_id: return
 
         try:
@@ -85,7 +81,7 @@ class NotionSync:
             }
             status_val = status_map.get(status, "Active")
             
-            self.notion.pages.update(
+            await self.notion.pages.update(
                 page_id=page_id,
                 properties={
                     "Status": {
@@ -97,22 +93,48 @@ class NotionSync:
         except Exception as e:
             logger.error(f"Failed to update Notion Page: {e}")
 
-    def get_tasks(self):
-        """Fetches all tasks from Notion database."""
+    async def find_task_by_link(self, link):
+        """Checks if a task with the given link already exists using search asynchronously."""
+        if not self.notion or not self.database_id or not link: return None
+        
+        try:
+            # Search for pages (recent typically appear first in search results)
+            response = await self.notion.search(
+                filter={"value": "page", "property": "object"},
+                sort={"direction": "descending", "timestamp": "last_edited_time"}
+            )
+            
+            # Verify the PROPERTY "Link"
+            for page in response.get("results", []):
+                # Verify DB ID
+                page_db_id = page.get("parent", {}).get("database_id", "").replace("-", "")
+                target_db_id = self.database_id.replace("-", "")
+                if page_db_id != target_db_id: continue
+
+                props = page.get("properties", {})
+                page_link = props.get("Link", {}).get("url", "")
+                
+                if page_link == link:
+                    return page['id']
+                    
+            return None
+        except Exception as e:
+            logger.error(f"Failed to check task existence via search: {e}")
+            return None
+
+    async def get_tasks(self):
+        """Fetches all tasks from Notion database using search asynchronously."""
         if not self.notion or not self.database_id: return []
 
         try:
-            # Fallback to search if query fails
-            response = self.notion.search(
+            response = await self.notion.search(
                 filter={"value": "page", "property": "object"},
                 sort={"direction": "descending", "timestamp": "last_edited_time"}
             )
             
             tasks = []
             for page in response.get("results", []):
-                # Check IDs (handle dashes/no-dashes comparison)
-                # Some pages return parent type as 'database_id', others as 'data_source_id'
-                # Just check if 'database_id' key exists in parent and matches.
+                # Verify DB ID
                 page_db_id = page.get("parent", {}).get("database_id", "").replace("-", "")
                 target_db_id = self.database_id.replace("-", "")
                 
@@ -150,7 +172,7 @@ class NotionSync:
                     "priority": get_number(props.get("Priority", {})),
                     "sender": get_rich_text(props.get("Sender", {})),
                     "link": get_url(props.get("Link", {})),
-                    "deadline": get_rich_text(props.get("Deadline", {})), # Assuming Deadline is Text for now
+                    "deadline": get_rich_text(props.get("Deadline", {})),
                     "notion_page_id": page["id"]
                 }
                 tasks.append(task)
@@ -159,3 +181,4 @@ class NotionSync:
         except Exception as e:
             logger.error(f"Failed to fetch tasks from Notion: {e}")
             return []
+

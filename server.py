@@ -27,7 +27,7 @@ async def read_root(request: Request):
 async def get_tasks():
     if not task_manager:
         return []
-    return task_manager.get_tasks()
+    return await task_manager.get_tasks()
 
 @app.post("/api/done/{task_id}")
 async def mark_done(task_id: str):
@@ -35,7 +35,7 @@ async def mark_done(task_id: str):
         return JSONResponse(status_code=500, content={"error": "TaskManager not initialized"})
     
     # SSOT: Direct call
-    task_manager.mark_done(task_id)
+    await task_manager.mark_done(task_id)
     if notification_callback:
         # We might need to fetch the task to get the summary for the notification
         # For now, let's just notify generic success or skip summary
@@ -49,7 +49,7 @@ async def reject_task(task_id: str):
         return JSONResponse(status_code=500, content={"error": "TaskManager not initialized"})
     
     # SSOT: Direct call
-    task_manager.reject_task(task_id)
+    await task_manager.reject_task(task_id)
     return {"status": "success", "task": task_id}
 
 @app.post("/api/reopen/{task_id}")
@@ -57,7 +57,7 @@ async def reopen_task(task_id: str):
     if not task_manager:
         return JSONResponse(status_code=500, content={"error": "TaskManager not initialized"})
     
-    task_manager.reopen_task(task_id)
+    await task_manager.reopen_task(task_id)
     return {"status": "success", "task": task_id}
 
 @app.get("/api/discussions/history")
