@@ -84,6 +84,7 @@ class TaskManager:
             "rejected": rejected
         }
 
+
     async def get_daily_briefing_tasks(self):
         """Returns top priority tasks for daily digest."""
         all_tasks = await self.get_tasks()
@@ -100,3 +101,19 @@ class TaskManager:
             "top_tasks": top_tasks,
             "deadline_tasks": deadline_tasks
         }
+
+    async def add_comment(self, task_id, text, sender):
+        """Adds a comment to a task."""
+        return await self.notion_sync.add_comment(task_id, text, sender)
+
+    async def get_comments(self, task_id):
+        """Fetches comments for a task."""
+        return await self.notion_sync.get_comments(task_id)
+
+    async def delete_comment(self, task_id, comment_id):
+        """Deletes a comment from a task."""
+        return await self.notion_sync.delete_comment(task_id, comment_id)
+
+    async def update_priority(self, task_id, priority):
+        """Updates the priority of a task."""
+        return await self.notion_sync.update_task_priority(task_id, priority)

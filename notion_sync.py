@@ -21,15 +21,17 @@ class NotionSync:
                 self.database_id = f"{self.database_id[:8]}-{self.database_id[8:12]}-{self.database_id[12:16]}-{self.database_id[16:20]}-{self.database_id[20:]}"
                 
         self.token = os.getenv("NOTION_TOKEN")
-        if self.token and self.database_id:
+        
+    def _get_client(self):
+        """Lazy initialization of AsyncClient to ensure it attaches to the current loop."""
+        if not self.notion and self.token:
             self.notion = AsyncClient(auth=self.token)
-            logger.info("Notion AsyncClient initialized.")
-        else:
-            logger.warning("NOTION_TOKEN or NOTION_DATABASE_ID missing. Sync disabled.")
+            logger.info("Notion AsyncClient initialized (Lazy).")
+        return self.notion
 
     async def create_task_page(self, task):
         """Creates a page in the database asynchronously."""
-        if not self.notion or not self.database_id: return None
+        if not self._get_client() or not self.database_id: return None
 
         try:
             priority_val = task.get('priority', 0)
@@ -42,7 +44,7 @@ class NotionSync:
             }
             status_val = status_map.get(task.get("status", "active"), "Active")
 
-            new_page = await self.notion.pages.create(
+            new_page = await self._get_client().pages.create(
                 parent={"database_id": self.database_id},
                 properties={
                     "Name": {
@@ -95,7 +97,7 @@ class NotionSync:
 
     async def find_task_by_link(self, link):
         """Checks if a task with the given link already exists using search asynchronously."""
-        if not self.notion or not self.database_id or not link: return None
+        if not self._get_client() or not self.database_id or not link: return None
         
         try:
             # Search for pages (recent typically appear first in search results)
@@ -122,12 +124,38 @@ class NotionSync:
             logger.error(f"Failed to check task existence via search: {e}")
             return None
 
+    def _parse_comments_text(self, full_text):
+        """Helper to parse raw comment text into structured list."""
+        comments = []
+        if full_text:
+            lines = full_text.split("\n")
+            import re
+            for line in lines:
+                if not line.strip(): continue
+                # Format: [ID] YYYY-MM-DD HH:MM:SS Sender: Text
+                match = re.match(r"\[(.*?)\] (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (.*?): (.*)", line)
+                if match:
+                    comments.append({
+                        "id": match.group(1),
+                        "timestamp": match.group(2),
+                        "sender": match.group(3),
+                        "text": match.group(4)
+                    })
+                else:
+                    comments.append({
+                        "id": "unknown",
+                        "timestamp": "",
+                        "sender": "Unknown",
+                        "text": line
+                    })
+        return comments[::-1] # Newest first
+
     async def get_tasks(self):
         """Fetches all tasks from Notion database using search asynchronously."""
-        if not self.notion or not self.database_id: return []
+        if not self._get_client() or not self.database_id: return []
 
         try:
-            response = await self.notion.search(
+            response = await self._get_client().search(
                 filter={"value": "page", "property": "object"},
                 sort={"direction": "descending", "timestamp": "last_edited_time"}
             )
@@ -164,6 +192,10 @@ class NotionSync:
                 status = get_select(props.get("Status", {})).lower()
                 summary = get_title(props.get("Name", {}))
                 
+                # Parse comments directly here to avoid N+1 fetches
+                comments_text = get_rich_text(props.get("AgentComments", {}))
+                comments = self._parse_comments_text(comments_text)
+
                 # Internal format
                 task = {
                     "id": page["id"], # Use Notion Page ID as internal ID
@@ -173,6 +205,7 @@ class NotionSync:
                     "sender": get_rich_text(props.get("Sender", {})),
                     "link": get_url(props.get("Link", {})),
                     "deadline": get_rich_text(props.get("Deadline", {})),
+                    "comments": comments, # Include comments
                     "notion_page_id": page["id"]
                 }
                 tasks.append(task)
@@ -182,3 +215,119 @@ class NotionSync:
             logger.error(f"Failed to fetch tasks from Notion: {e}")
             return []
 
+
+    async def get_comments(self, page_id):
+        """Fetches comments from the AgentComments text property."""
+        if not self._get_client() or not page_id: return []
+
+        try:
+            page = await self._get_client().pages.retrieve(page_id)
+            props = page.get("properties", {})
+            rich_text = props.get("AgentComments", {}).get("rich_text", [])
+            full_text = "".join([t.get("text", {}).get("content", "") for t in rich_text])
+            
+            return self._parse_comments_text(full_text)
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch comments: {e}")
+            return []
+
+    async def add_comment(self, page_id, text, sender="Unknown"):
+        """Appends a comment to the AgentComments property."""
+        if not self._get_client() or not page_id: return None
+        
+        try:
+            import datetime
+            import uuid
+            
+            # timestamp
+            now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            comment_id = str(uuid.uuid4())[:8] # Short ID
+            
+            new_line = f"[{comment_id}] {now} {sender}: {text}"
+            
+            # 1. Get existing text
+            page = await self._get_client().pages.retrieve(page_id)
+            props = page.get("properties", {})
+            rich_text = props.get("AgentComments", {}).get("rich_text", [])
+            current_text = "".join([t.get("text", {}).get("content", "") for t in rich_text])
+            
+            updated_text = current_text + ("\n" if current_text else "") + new_line
+            
+            # 3. Update
+            await self._get_client().pages.update(
+                page_id=page_id,
+                properties={
+                    "AgentComments": {
+                        "rich_text": [{"text": {"content": updated_text[:2000]}}]
+                    }
+                }
+            )
+            logger.info(f"Added comment to {page_id}: {text}")
+            return {
+                "id": comment_id,
+                "timestamp": now,
+                "sender": sender,
+                "text": text
+            }
+        except Exception as e:
+            logger.error(f"Failed to add comment: {e}")
+            return None
+
+    async def delete_comment(self, page_id, comment_id):
+        """Removes a comment line by ID."""
+        if not self._get_client() or not page_id: return False
+        
+        try:
+            # 1. Get existing text
+            page = await self._get_client().pages.retrieve(page_id)
+            props = page.get("properties", {})
+            rich_text = props.get("AgentComments", {}).get("rich_text", [])
+            current_text = "".join([t.get("text", {}).get("content", "") for t in rich_text])
+            
+            if not current_text: return False
+            
+            # 2. Filter lines
+            lines = current_text.split("\n")
+            new_lines = [line for line in lines if f"[{comment_id}]" not in line]
+            
+            if len(lines) == len(new_lines):
+                logger.warning(f"Comment {comment_id} not found.")
+                return False
+                
+            updated_text = "\n".join(new_lines)
+            
+            # 3. Update
+            await self._get_client().pages.update(
+                page_id=page_id,
+                properties={
+                    "AgentComments": {
+                        "rich_text": [{"text": {"content": updated_text[:2000]}}]
+                    }
+                }
+            )
+            logger.info(f"Deleted comment {comment_id} from {page_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to delete comment: {e}")
+            return False
+
+    async def update_task_priority(self, page_id, priority):
+        """Updates the Priority number property asynchronously."""
+        if not self._get_client() or not page_id: return False
+
+        try:
+            await self._get_client().pages.update(
+                page_id=page_id,
+                properties={
+                    "Priority": {
+                        "number": int(priority)
+                    }
+                }
+            )
+            logger.info(f"Updated Notion Page {page_id} Priority to {priority}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update Notion Page Priority: {e}")
+            return False

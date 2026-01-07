@@ -355,6 +355,7 @@
             container.innerHTML = html;
         }
 
+
         function getTaskHTML(task, isDone, index) {
             const delay = index * 0.05; // Staggered animation
             let pColor = 'text-blue-400 border-blue-500/20 bg-blue-500/5';
@@ -372,14 +373,37 @@
                 ? '<span class="text-red-500 text-xs font-bold tracking-wider uppercase border border-red-900/50 px-2 py-1 rounded bg-red-900/20">Rejected</span>'
                 : '<span class="text-emerald-500 text-xs font-bold tracking-wider uppercase border border-emerald-900/50 px-2 py-1 rounded bg-emerald-900/20">Completed</span>';
 
+            // Comment HTML pre-generation
+            const commentsHtml = renderCommentListHTML(task.id, task.comments || []);
+            const hasComments = task.comments && task.comments.length > 0;
+            // Default: Show if exists (User request: "display the comments by default")
+            const isRefHidden = false;
+
             return `
                 <div class="glass p-6 rounded-2xl mb-4 transition-all duration-300 border border-gray-800 relative group animate-slide-up ${glow}" style="animation-delay: ${delay}s">
                     <div class="flex flex-col md:flex-row justify-between items-start gap-4">
                         <div class="flex-1 w-full">
                             <div class="flex flex-wrap items-center gap-3 mb-3">
-                                <span class="px-2.5 py-1 rounded-md text-xs font-bold font-mono border ${pColor}">
-                                    P${task.priority}
-                                </span>
+                                <!-- Priority Selector -->
+                                <div class="relative group/priority">
+                                    <select onchange="updatePriority('${task.id}', this.value)" 
+                                        class="appearance-none cursor-pointer pl-3 pr-6 py-1 rounded-md text-xs font-bold font-mono border ${pColor} bg-gray-900/50 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all">
+                                        <option value="1" ${task.priority == 1 ? 'selected' : ''}>P1</option>
+                                        <option value="2" ${task.priority == 2 ? 'selected' : ''}>P2</option>
+                                        <option value="3" ${task.priority == 3 ? 'selected' : ''}>P3</option>
+                                        <option value="4" ${task.priority == 4 ? 'selected' : ''}>P4</option>
+                                        <option value="5" ${task.priority == 5 ? 'selected' : ''}>P5</option>
+                                        <option value="6" ${task.priority == 6 ? 'selected' : ''}>P6</option>
+                                        <option value="7" ${task.priority == 7 ? 'selected' : ''}>P7</option>
+                                        <option value="8" ${task.priority == 8 ? 'selected' : ''}>P8</option>
+                                        <option value="9" ${task.priority == 9 ? 'selected' : ''}>P9</option>
+                                        <option value="10" ${task.priority == 10 ? 'selected' : ''}>P10</option>
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-gray-500">
+                                        <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                    </div>
+                                </div>
+
                                 <span class="text-xs text-gray-500 font-mono flex items-center gap-1">
                                     <svg class="w-3 h-3 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     ${task.time || 'Today'}
@@ -397,11 +421,33 @@
                                 ${task.summary}
                             </h3>
                             
-                            ${task.link && task.link.startsWith('http') ? `
-                                <a href="${task.link}" target="_blank" class="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 mt-2 transition-colors opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 duration-300">
-                                    View Context ↗
-                                </a>
-                            ` : ''}
+                            <div class="flex items-center gap-3 mt-2">
+                                ${task.link && task.link.startsWith('http') ? `
+                                    <a href="${task.link}" target="_blank" class="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                                        View Context ↗
+                                    </a>
+                                ` : ''}
+                                <button onclick="toggleComments('${task.id}')" class="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors">
+                                    <span id="comment-toggle-text-${task.id}">${isRefHidden ? '💬 Show Comments' : '💬 Hide Comments'}</span>
+                                </button>
+                            </div>
+
+                            <!-- Comment Section -->
+                            <div id="comments-${task.id}" class="${isRefHidden ? 'hidden' : ''} mt-4 pt-4 border-t border-gray-800/50">
+                                <div id="comment-list-${task.id}" class="space-y-3 mb-3">
+                                    ${commentsHtml}
+                                </div>
+                                <div class="flex gap-2">
+                                    <input type="text" id="comment-input-${task.id}" placeholder="Add a comment..." 
+                                        class="flex-1 bg-gray-900/50 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500 transition-colors"
+                                        onkeypress="handleCommentEnter(event, '${task.id}')">
+                                    <button onclick="addComment('${task.id}')" 
+                                        class="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors">
+                                        Send
+                                    </button>
+                                </div>
+                            </div>
+
                         </div>
                         
                         <div class="flex items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
@@ -428,6 +474,112 @@
                     </div>
                 </div>
             `;
+        }
+
+        // Comment Logic
+        async function toggleComments(taskId) {
+            const container = document.getElementById(`comments-${taskId}`);
+            const isHidden = container.classList.contains('hidden');
+
+            if (isHidden) {
+                container.classList.remove('hidden');
+                container.classList.add('animate-fade-in');
+                await fetchComments(taskId);
+            } else {
+                container.classList.add('hidden');
+            }
+        }
+
+        async function fetchComments(taskId) {
+            const list = document.getElementById(`comment-list-${taskId}`);
+            try {
+                const response = await fetch(`/api/comments/${taskId}`);
+                const comments = await response.json();
+                renderCommentList(taskId, comments);
+            } catch (error) {
+                console.error("Error fetching comments", error);
+                list.innerHTML = '<p class="text-xs text-red-400">Failed to load comments.</p>';
+            }
+        }
+
+        function renderCommentListHTML(taskId, comments) {
+            if (!comments || comments.length === 0) {
+                return '<p class="text-xs text-gray-600 italic">No comments yet.</p>';
+            }
+
+            return comments.map(c => `
+                <div class="group/comment flex justify-between items-start gap-2 bg-gray-800/30 p-2 rounded hover:bg-gray-800/60 transition-colors">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-bold text-gray-400">${c.sender}</span>
+                            <span class="text-[10px] text-gray-600">${c.timestamp}</span>
+                        </div>
+                        <p class="text-sm text-gray-300">${c.text}</p>
+                    </div>
+                    <button onclick="deleteComment('${taskId}', '${c.id}')" 
+                        class="text-gray-600 hover:text-red-400 opacity-0 group-hover/comment:opacity-100 transition-all p-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function renderCommentList(taskId, comments) {
+            const list = document.getElementById(`comment-list-${taskId}`);
+            list.innerHTML = renderCommentListHTML(taskId, comments);
+        }
+
+        function handleCommentEnter(e, taskId) {
+            if (e.key === 'Enter') addComment(taskId);
+        }
+
+        async function addComment(taskId) {
+            const input = document.getElementById(`comment-input-${taskId}`);
+            const text = input.value.trim();
+            if (!text) return;
+
+            // Optimistic UI update could be done here, but let's wait for server
+            input.value = '';
+            input.disabled = true;
+
+            try {
+                const response = await fetch(`/api/comments/${taskId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text, sender: 'User' }) // TODO: Real user name?
+                });
+
+                if (response.ok) {
+                    await fetchComments(taskId); // Refresh
+                    showToast('Comment added', 'success');
+                } else {
+                    showToast('Failed to add comment', 'error');
+                    input.value = text; // Restore
+                }
+            } catch (e) {
+                console.error(e);
+                showToast('Error sending comment', 'error');
+            } finally {
+                input.disabled = false;
+                input.focus();
+            }
+        }
+
+        async function deleteComment(taskId, commentId) {
+            if (!confirm('Delete this comment?')) return;
+
+            try {
+                const response = await fetch(`/api/comments/${taskId}/${commentId}`, { method: 'DELETE' });
+                if (response.ok) {
+                    await fetchComments(taskId);
+                    showToast('Comment deleted', 'neutral');
+                } else {
+                    showToast('Failed to delete comment', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+                showToast('Error deleting comment', 'error');
+            }
         }
 
         // Initial load

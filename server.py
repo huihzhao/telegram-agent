@@ -71,3 +71,49 @@ async def get_today_discussion():
     from discussion_buffer import DiscussionBuffer
     db = DiscussionBuffer()
     return db.get_grouped_text() or "No discussions yet."
+
+from pydantic import BaseModel
+class CommentRequest(BaseModel):
+    text: str
+    sender: str = "User"
+
+@app.get("/api/comments/{task_id}")
+async def get_comments(task_id: str):
+    if not task_manager: return []
+    return await task_manager.get_comments(task_id)
+
+@app.post("/api/comments/{task_id}")
+async def add_comment(task_id: str, request: CommentRequest):
+    if not task_manager:
+        return JSONResponse(status_code=500, content={"error": "TaskManager not initialized"})
+    
+    result = await task_manager.add_comment(task_id, request.text, request.sender)
+    if result:
+        return result
+    return JSONResponse(status_code=500, content={"error": "Failed to add comment"})
+
+@app.delete("/api/comments/{task_id}/{comment_id}")
+async def delete_comment(task_id: str, comment_id: str):
+    if not task_manager:
+        return JSONResponse(status_code=500, content={"error": "TaskManager not initialized"})
+        
+    success = await task_manager.delete_comment(task_id, comment_id)
+    if success:
+        return {"status": "success"}
+    return JSONResponse(status_code=404, content={"error": "Comment not found or failed to delete"})
+
+
+@app.post("/api/priority/{task_id}")
+async def update_priority(task_id: str, request: dict):
+    if not task_manager:
+        return JSONResponse(status_code=500, content={"error": "TaskManager not initialized"})
+    
+    priority = request.get("priority")
+    if priority is None:
+        return JSONResponse(status_code=400, content={"error": "Priority missing"})
+        
+    success = await task_manager.update_priority(task_id, priority)
+    if success:
+        return {"status": "success", "task": task_id, "priority": priority}
+    return JSONResponse(status_code=500, content={"error": "Failed to update priority"})
+
